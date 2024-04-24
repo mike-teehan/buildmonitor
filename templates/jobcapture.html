@@ -1,0 +1,31 @@
+<style>
+#capturegrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    grid-auto-rows: 100px;
+}
+</style>
+<div style="display: flex; flex-direction: row; height: 100%;">
+    <div style="flex-grow: 1; position: relative;">
+        {% include "livecamera.html" %}
+    </div>
+    <div style="display: flex; flex-direction: column; flex-grow: 1; max-width: 22%;">
+        <fieldset>
+            <legend>Job Name</legend>
+            <h3>{{ name }}</h3>
+            <button style="" hx-post="/job/{{ name }}/complete">Complete</button>
+        </fieldset>
+        <span id="capturegrid" style="padding-right: 10px; flex-grow: 1; justify-content: flex-start; overflow: auto;" hx-get="/job/{{ name }}/snapshot/list" hx-trigger="load, updatecapture from:body">
+            <div>1</div>
+            <div>1</div>
+            <div>1</div>
+            <div>1</div>
+            <div>1</div>
+            <div>1</div>
+            <div>1</div>
+            <div>1</div>
+        </span>
+        <button style="height: 5em;" hx-get="/job/{{ name }}/snapshot" hx-target="#capturegrid" hx-swap="innerHTML">Snapshot</button>
+    </div>
+</div>

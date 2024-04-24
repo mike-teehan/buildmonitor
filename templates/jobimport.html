@@ -1,0 +1,19 @@
+<form id="newjobform" hx-encoding="multipart/form-data" hx-post="/job/import" hx-trigger="change, drop" hx-target="#workview" style="display: flex; height: 100%; flex-grow: 1; justify-content: center; align-items: center;">
+    <label id="newjobpdflabel" for="newjobpdf" style="padding: 7em 10em 7em 10em; border: 1px solid black; background-color: #bbb; border-radius: 1em;">Upload PDF:
+        <input id="newjobpdf" name="newjobpdf" type="file" accept="application/pdf">
+    </label>
+</form>
+<script>
+"use strict";
+function drop(e) {
+    e.preventDefault();
+
+    let data = e.dataTransfer.files;
+    console.log(`data: ${data}`);
+    document.getElementById("newjobpdf").files = data;
+}
+
+document.getElementById("newjobpdflabel").addEventListener("dragover", (e) => { e.preventDefault(); });
+document.getElementById("newjobpdflabel").addEventListener("drop", drop);
+document.getElementById("newjobform").addEventListener("drop", drop);
+</script>

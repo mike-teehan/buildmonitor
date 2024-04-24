@@ -1,0 +1,133 @@
+<style>
+#newimportpdf {
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 0; right: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+#ocrcursor {
+    display: none;
+    box-sizing: border-box;
+    top: 0; left: 0;
+}
+.ocrcursor {
+    position: fixed;
+    display: block !important;
+    width: {{ ocrcursize[0] }}px; height: {{ ocrcursize[1] }}px;
+    border: 1px solid black;
+    pointer-events: none;
+}
+#pdfpage {
+    flex-grow: 2;
+    height: 90%;
+    width: auto;
+    border: 1px solid black;
+}
+#actionbtns {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+}
+</style>
+<div id="newimportpdf">
+    <div id="ocrcursor"></div>
+    <img id="pdfpage" src="/job/import/{{ pdfid }}/1">
+    <div id="actionbtns">
+        {% include "ocrcontrols.html" -%}
+    </div>
+</div>
+<script>
+"use strict";
+
+var zoom = 1.0;
+
+// called every time a mousemove event happens
+function moveOCRCursor(e) {
+    // cache important element selector
+    let pp = document.getElementById("pdfpage");
+    let ocrcur = document.getElementById("ocrcursor");
+    let ocrrect = document.getElementById("ocrrect");
+
+    // use the bounding box to find the size (or halfsize) of the ocr div
+    const viewrect = pp.getBoundingClientRect();
+    const halfwidth = ocrcur.offsetWidth / 2;
+    let x = e.clientX - halfwidth;
+    const halfheight = ocrcur.offsetHeight / 2;
+    let y = e.clientY - halfheight;
+
+    // figure out if any part of ocr cursor would be outside the img element and constrain it to the edges
+    if(x - viewrect.left < 0)
+        x = viewrect.left;
+    if(x + (halfwidth * 2) - viewrect.right > 0)
+        x = viewrect.right - (halfwidth * 2);
+    if(y - viewrect.top < 0)
+        y = viewrect.top;
+    if(y + (halfheight * 2) - viewrect.bottom > 0)
+        y = viewrect.bottom - (halfheight * 2);
+
+    // calculate the percentage of the ocr cursor's x pos, y pos, width and height relative to the img's width and height
+    const xpct = (x - viewrect.left) / pp.offsetWidth,
+        ypct = (y - viewrect.top) / pp.offsetHeight,
+        wpct = (halfwidth * 2) / pp.offsetWidth,
+        hpct = (halfheight * 2) / pp.offsetHeight;
+
+//    console.log(`xpct: ${xpct} ypct: ${ypct} wpct: ${wpct} hpct: ${hpct}`);
+    // update the hidden input in the form with the new percentages' json
+    if(wpct > 0 && hpct > 0) // but WHY?!?
+        ocrrect.value = JSON.stringify([ xpct, ypct, wpct, hpct ]);
+
+    if((viewrect.left + halfwidth <= e.clientX <= viewrect.right - halfwidth) && (viewrect.top <= e.clientY <= viewrect.bottom))
+        showOCRCursor(e);
+    else
+        hideOCRCursor(e);
+
+//    console.log(`x: ${x} y:${y} ex:${e.clientX} ey:${e.clientY} vl:${viewrect.left} vt:${viewrect.top}`);
+    ocrcur.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    ocrcur.classList.add("ocrcursor");
+}
+
+function showOCRCursor(e) {
+    let ocrcur = document.getElementById("ocrcursor");
+    ocrcur.classList.add("ocrcursor");
+}
+
+function hideOCRCursor(e) {
+    let ocrcur = document.getElementById("ocrcursor");
+    ocrcur.classList.remove("ocrcursor");
+}
+
+// adjust the size of the ocr cursor up or down via the mousewheel
+function scaleOCRCursor(e) {
+    let ocrcur = document.getElementById("ocrcursor");
+    // zoom in fixed steps only
+    let y = e.deltaY;
+    let zoomstep = 0.0;
+    if(y > 0)
+        zoomstep = 0.05;
+    else if(y < 0)
+        zoomstep = -0.05;
+
+    // make sure zoom doesn't get to zero
+    zoom += zoomstep;
+    if(zoomstep < 0.05)
+        zoomstep = 0.05;
+
+    // update and then set the ocr cursor width and height
+    const w = {{ ocrcursize[0] }} * zoom;
+    const h = {{ ocrcursize[1] }} * zoom;
+    ocrcur.style.width = `${w}px`;
+    ocrcur.style.height = `${h}px`;
+
+    // update everything visually
+    moveOCRCursor(e);
+}
+
+// add mouse event listeners
+document.getElementById("pdfpage").addEventListener('mousemove', moveOCRCursor);
+document.getElementById("pdfpage").addEventListener('mouseleave', hideOCRCursor);
+document.getElementById("pdfpage").addEventListener('wheel', scaleOCRCursor);
+
+</script>

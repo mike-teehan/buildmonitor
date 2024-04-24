@@ -2,38 +2,88 @@
 <html>
 <head>
     <style>
+body, .selectwrapper > select, .selectwrapper  > select > option, .selectwrapper > legend {
+    background-color: black;
+    color: white;
+}
+::selection {
+    color: black !important;
+    background: white !important;
+}
 #content, .bg {
     position: absolute;
     top: 0; bottom: 0;
     left: 0; right: 0;
 }
 .bg {
+    width: auto; height: 100%;
     background-image: url("/camera");
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
     flex-grow: 2;
 }
+#leftcolumn {
+    width: 10em;
+    display: flex;
+    flex-grow: 1;
+    max-width: 20em;
+    flex-direction: column;
+    justify-content: space-around;
+}
+#workview {
+    flex-grow: 10;
+}
+.selectwrapper {
+    display: flex;
+    flex-direction: column;
+    padding-left: 0; padding-right: 0; padding-bottom: 0;
+}
     </style>
 </head>
 <body>
     <div id="content">
         <div style="display: flex; width: 100%; height: 100%;">
-            <div style="width: 10em; display: flex; flex-direction: column;">
-                <input id="newjobbtn" type="button" value="New Job">
-                <select id="jobselect" size="8">
-                    <option>1</option>
-                    <option>2</option>
-                    <option>3</option>
-                    <option>4</option>
-                    <option>5</option>
-                    <option>6</option>
-                    <option>7</option>
-                </select>
+            <div id="leftcolumn">
+                <div style="display: flex; justify-content: center; align-items: start; height: 4em; text-align: center; background-image: url('/res/indologo.png'); background-position: center; background-size: contain; background-repeat: no-repeat; font-size: 2em; font-weight: bold;">BuildMonitor v0.1</div>
+
+                <fieldset class="selectwrapper" hx-get="/job/import/list" hx-trigger="load, updateimport from:body" hx-target="#importselect" hx-swap="innerHTML">
+                    <legend style="display: flex; flex-direction: row; width: 100%;">
+                        Import:
+                        <span style="flex-grow: 1;"><hr></span>
+                        <input id="importsearch" name="importsearch" type="text" placeholder="filter..." style="flex-grow: 1; max-width: 60%;"
+                            hx-get="/job/import/list" hx-trigger="keyup changed delay:250ms" hx-target="#importselect" hx-swap="innerHTML">
+                        <button id="importsearchclear" hx-get="/job/import/list"  hx-target="#importselect" hx-swap="innerHTML">X</button>
+                    </legend>
+                    <select id="importselect" size="6">
+                        <option></option>
+                    </select>
+                    <input id="newimportbtn" type="button" value="New Import" hx-get="/job/import" hx-target="#workview" hx-trigger="click">
+                </fieldset>
+
+                <fieldset class="selectwrapper" hx-get="/job/list" hx-trigger="load, updatejob from:body" hx-target="#jobselect" hx-swap="innerHTML">
+                    <legend style="display: flex; flex-direction: row; width: 100%;">
+                        Job:
+                        <span style="flex-grow: 1;"><hr></span>
+                        <input id="selectsearch" name="selectsearch" type="text" placeholder="filter..." style="flex-grow: 1; max-width: 60%;"
+                            hx-get="/job/list" hx-trigger="keyup changed delay:250ms" hx-target="#jobselect" hx-swap="innerHTML">
+                        <button id="selectsearchclear" hx-get="/job/list"  hx-target="#jobselect" hx-swap="innerHTML">X</button>
+                    </legend>
+                    <select id="jobselect" size="6">
+                        <option></option>
+                    </select>
+                </fieldset>
+
+                <fieldset class="selectwrapper"
+                    hx-get="/job/complete/list" hx-trigger="load, updatecomplete from:body" hx-target="#completeselect" hx-swap="innerHTML">
+                    <legend>Complete:</legend>
+                    <select id="completeselect" size="8">
+                        <option></option>
+                    </select>
+                </fieldset>
             </div>
-            <div style="flex-grow: 2; position: relative;">
-                <div id="bg0" class="bg"></div>
-                <div id="bg1" class="bg"></div>
+            <div id="workview" style="flex-grow: 1; position: relative;">
+                {% include "livecamera.html" %}
             </div>
         </div>
     </div>
@@ -41,26 +91,27 @@
     <script>
 "use strict";
 
-const sleep = ms => new Promise(res => setTimeout(res, ms));
-
-const bgupdater = async() => {
-    let top = 1;
-    const bg0 = document.getElementById("bg0");
-    const bg1 = document.getElementById("bg1");
-    while(true) {
-        let bbg = (top == 1) ? bg0 : bg1;
-        let fbg = (top == 1) ? bg1 : bg0;
-        bbg.style.zIndex = -2;
-        fbg.style.zIndex = -1;
-        let randomid = Math.floor(Math.random() * 1000000);
-        bbg.style.backgroundImage = `url("/camera?${randomid}")`;
-//        console.log("boop");
-        top = (top + 1) % 2;
-        await sleep(1000);
-    }
+document.getElementById("selectsearchclear").onclick = (e) => {
+    document.getElementById("selectsearch").value = "";
+}
+document.getElementById("importsearchclear").onclick = (e) => {
+    document.getElementById("importzsearch").value = "";
 }
 
-bgupdater();
+setInterval(() => {
+    let bg0 = document.getElementById("bg0");
+    let bg1 = document.getElementById("bg1");
+    if(!bg0 || !bg1)
+        return;
+    let top = (bg0.style.zIndex == -1) ? 1 : 0;
+    let bbg = (top == 1) ? bg0 : bg1;
+    let fbg = (top == 1) ? bg1 : bg0;
+    let randomid = Math.floor(Math.random() * 1000000);
+    let randomid2 = Math.floor(Math.random() * 1000000);
+    bbg.style.cssText = `z-index: -2; background-image: url("/camera?${randomid}${randomid2}");`;
+    fbg.style.zIndex = -1;
+}, 2500);
+
     </script>
 </body>
 </html>
