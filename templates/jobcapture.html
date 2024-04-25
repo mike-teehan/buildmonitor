@@ -5,11 +5,13 @@
     gap: 10px;
     grid-auto-rows: 100px;
 }
+#cameragriditem {
+    grid-column: 1 / span 2;
+    grid-row: 1 / span 2;
+}
 </style>
 <div style="display: flex; flex-direction: row; height: 100%;">
-    <div style="flex-grow: 1; position: relative;">
-        {% include "livecamera.html" %}
-    </div>
+    {% include "livecamera.html" %}
     <div style="display: flex; flex-direction: column; flex-grow: 1; max-width: 22%;">
         <fieldset>
             <legend>Job Name</legend>
