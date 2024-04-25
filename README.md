@@ -9,6 +9,12 @@ $ python -m venv .
 $ . bin/activate  
 $ pip install -r requirements.txt
 ```
+UPDATE
+```
+$ git pull
+$ . bin/activate  
+$ pip install -r requirements.txt
+```
 RUN:
 ```
 $ ./buildmonitor.py  
