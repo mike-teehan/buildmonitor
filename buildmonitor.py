@@ -214,7 +214,7 @@ def imageaddtext(im: Image.Image, font: ImageFont = ImageFont.truetype("VT323-Re
 
 @app.route('/job/<name>/image', methods=['GET'])
 def jobnameimage(name: str) -> Response:
-    return send_file(f"job/{name}/doc-0000.png")
+    return send_file(f"{app.config['JOB_FOLDER']}/{name}/doc-0000.png")
 
 @app.route('/job/<name>/complete', methods=['GET'])
 def jobnamecomplete(name: str) -> Response:

@@ -58,7 +58,7 @@ body, .selectwrapper > select, .selectwrapper  > select > option, .selectwrapper
                     <select id="importselect" size="6">
                         <option></option>
                     </select>
-                    <input id="newimportbtn" type="button" value="New Import" hx-get="/job/import" hx-target="#workview" hx-trigger="click">
+                    <input id="newimportbtn" type="button" value="New Import" hx-get="/import" hx-target="#workview" hx-trigger="click">
                 </fieldset>
 
                 <fieldset class="selectwrapper" hx-get="/job/list" hx-trigger="load, updatejob from:body" hx-target="#jobselect" hx-swap="innerHTML">
