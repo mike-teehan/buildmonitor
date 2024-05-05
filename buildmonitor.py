@@ -31,10 +31,10 @@ app.config.update(
     COMPLETE_FOLDER = "data/complete"
 )
 
-@sockets. .on('connect')
-def onconnect(e):
-    print(f"{e=}")
-    pass
+#@sockets.on('connect')
+#def onconnect(e):
+#    print(f"{e=}")
+#    pass
 
 # https://github.com/jgelens/gevent-websocket/blob/master/geventwebsocket/websocket.py
 @sockets.route('/ws', websocket=True)
@@ -354,7 +354,7 @@ def jobimportlist() -> Response:
             if len(importfilter) == 0 or importfilter in pdfid:
                 ret.append(pdfid)
 
-    return Response(render_template('listoptions.html', category="import", items=ret))
+    return Response(render_template('listoptions.html', category="import", items=ret, suffix="1/ocr"))
 
 # display the job create ocr view
 @app.route('/import/<pdfid>/<pagenum>/ocr', methods=['GET'])
