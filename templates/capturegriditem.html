@@ -1,1 +1,18 @@
-<div class="capturegriditem" style="min-height: 80px; min-height: 100px; background-image: url('/job/{{ name }}/snapshot/image/{{ snapnum }}?mini=1'); background-size: contain; background-position: center; background-repeat: no-repeat;"></div>
+<style>
+.capturegriditem {
+    min-height: 80px; max-height: 100px;
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.activecapturegriditem {
+    box-shadow: 0px 0px 10px 5px rgba(255,255,255,0.9);
+}
+</style>
+{% for snapnum in snaps -%}
+{% if snaps|length > snapnum|int %}
+<div class="capturegriditem activecapturegriditem" style="background-image: url('/job/{{ name }}/snapshot/image/{{ snapnum }}?mini=1');"></div>
+{% else %}
+<div class="capturegriditem" style="background-image: url('/job/{{ name }}/snapshot/image/{{ snapnum }}?mini=1');"></div>
+{% endif %}
+{% endfor %}

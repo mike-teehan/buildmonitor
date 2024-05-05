@@ -47,13 +47,13 @@ body, .selectwrapper > select, .selectwrapper  > select > option, .selectwrapper
             <div id="leftcolumn">
                 <div style="display: flex; justify-content: center; align-items: start; height: 4em; text-align: center; background-image: url('/res/indologo.png'); background-position: center; background-size: contain; background-repeat: no-repeat; font-size: 2em; font-weight: bold;">BuildMonitor v0.1</div>
 
-                <fieldset class="selectwrapper" hx-get="/job/import/list" hx-trigger="load, updateimport from:body" hx-target="#importselect" hx-swap="innerHTML">
+                <fieldset class="selectwrapper" hx-get="/import/list" hx-trigger="load, updateimport from:body" hx-target="#importselect" hx-swap="innerHTML">
                     <legend style="display: flex; flex-direction: row; width: 100%;">
                         Import:
                         <span style="flex-grow: 1;"><hr></span>
                         <input id="importsearch" name="importsearch" type="text" placeholder="filter..." style="flex-grow: 1; max-width: 60%;"
-                            hx-get="/job/import/list" hx-trigger="keyup changed delay:250ms" hx-target="#importselect" hx-swap="innerHTML">
-                        <button id="importsearchclear" hx-get="/job/import/list"  hx-target="#importselect" hx-swap="innerHTML">X</button>
+                            hx-get="/import/list" hx-trigger="keyup changed delay:250ms" hx-target="#importselect" hx-swap="innerHTML">
+                        <button id="importsearchclear" hx-get="/import/list"  hx-target="#importselect" hx-swap="innerHTML">X</button>
                     </legend>
                     <select id="importselect" size="6">
                         <option></option>
@@ -74,13 +74,17 @@ body, .selectwrapper > select, .selectwrapper  > select > option, .selectwrapper
                     </select>
                 </fieldset>
 
+                <form hx-ext="ws" ws-connect="/ws">
                 <fieldset class="selectwrapper"
-                    hx-get="/job/complete/list" hx-trigger="load, updatecomplete from:body" hx-target="#completeselect" hx-swap="innerHTML">
+                    hx-get="/complete/list" hx-trigger="load, updatecomplete from:body" hx-target="#completeselect" hx-swap="innerHTML">
                     <legend>Complete:</legend>
                     <select id="completeselect" size="8">
                         <option></option>
                     </select>
+                    <input name="fartsnacks" type="hidden" value="3.14159">
+                    <button ws-send>Test</button>
                 </fieldset>
+                </form>
             </div>
             <div id="workview" style="flex-grow: 1; position: relative;">
                 {% include "livecamera.html" %}
@@ -88,6 +92,7 @@ body, .selectwrapper > select, .selectwrapper  > select > option, .selectwrapper
         </div>
     </div>
     <script src="/res/htmx.min.js"></script>
+    <script src="/res/htmx.ws.js"></script>
     <script>
 "use strict";
 
@@ -95,22 +100,51 @@ document.getElementById("selectsearchclear").onclick = (e) => {
     document.getElementById("selectsearch").value = "";
 }
 document.getElementById("importsearchclear").onclick = (e) => {
-    document.getElementById("importzsearch").value = "";
+    document.getElementById("importsearch").value = "";
 }
 
-setInterval(() => {
-    let bg0 = document.getElementById("bg0");
-    let bg1 = document.getElementById("bg1");
-    if(!bg0 || !bg1)
-        return;
-    let top = (bg0.style.zIndex == -1) ? 1 : 0;
-    let bbg = (top == 1) ? bg0 : bg1;
-    let fbg = (top == 1) ? bg1 : bg0;
-    let randomid = Math.floor(Math.random() * 1000000);
-    let randomid2 = Math.floor(Math.random() * 1000000);
-    bbg.style.cssText = `z-index: -2; background-image: url("/camera?${randomid}${randomid2}");`;
-    fbg.style.zIndex = -1;
-}, 2500);
+function updatecamera() {
+    // dynamically get our divs every time
+    let cam = [ document.getElementById("camera0"), document.getElementById("camera1"), document.getElementById("camera2") ];
+    let cambg = document.getElementById("camerabg");
+    // only update when cam[0-2] all exist, otherwise just wait and check again later
+    if(cam[0] && cam[1] && cam[2]) {
+        let top = 0; // camera layer currently on top
+        for(let i = 0, c; (c = cam[i]); i++) // loop thru cam with i <= index, c <= cam[i]
+            top = (c.style.zIndex == -1) ? i : top; // zindex -1 means it is currently on top
+        let next = (top + 1) % cam.length; // next element needs to wrap around "mod"
+
+//        let bbg = (top == 1) ? cam0 : cam1;
+//        let fbg = (top == 1) ? cam1 : cam0;
+//        bbg.style.cssText = `z-index: -2; background-image: url("/camera?${randomid1}${randomid2}");`;
+
+        // show next camera div then hide the old ones
+        cam[next].style.display = "block";
+        cam[next].style.zIndex = -1;
+        for(let i = 0, c; (c = cam[i]); i++) {
+            if(i == next) // don't hide the new one just made visible
+                continue;
+            c.display = "none";
+        }
+
+        // get pos from html data-pos, default to ll
+        let pos = cambg?.dataset["pos"] || "ll"
+        // make some random numbers so the camera doesn't get cached
+        let randomid1 = String(Math.floor(Math.random() * 1000000)).padStart(6, '0'); // "000000" - "999999"
+        let randomid2 = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+        // update the (now hidden) top with a new image url
+        cam[top].style.cssText = `background-image: url("/camera?pos=${pos}&${randomid1}${randomid2}");`;
+    }
+
+    // if no data-fps, assume 0.5 (2 seconds per frame)
+    let fps = cambg?.dataset["fps"] || 0.5;
+    // calculate ms delay from fps
+    let loopdelay = (1 / fps) * 1000;
+    // set the next timeout
+    setTimeout(updatecamera, loopdelay);
+}
+
+updatecamera();
 
     </script>
 </body>

@@ -9,25 +9,27 @@
     grid-column: 1 / span 2;
     grid-row: 1 / span 2;
 }
+#jobcroppage {
+    flex-grow: 2;
+    height: 90%;
+    width: auto;
+    border: 1px solid black;
+}
 </style>
 <div style="display: flex; flex-direction: row; height: 100%;">
-    {% include "livecamera.html" %}
+    <div style="display: flex; flex-direction: column;">
+        <img id="jobcroppage" src="/job/{{ name}}/image">
+    {#    {% include "cropcontrols.html" %} #}
+    </div>
     <div style="display: flex; flex-direction: column; flex-grow: 1; max-width: 22%;">
         <fieldset>
-            <legend>Job Name</legend>
-            <h3>{{ name }}</h3>
-            <button style="" hx-post="/job/{{ name }}/complete">Complete</button>
+            <legend><b>Job Name: {{ name }}</b></legend>
+            {% include "livecamera.html" %}
+            <button style="width: 100%; height: 3em;" hx-get="/job/{{ name }}/snapshot" hx-target="#capturegrid" hx-swap="innerHTML">
+                <img src="res/camera.svg" type="image/svg+xml" style="width: 100%; height: 2.5em;"">
+            </button>
         </fieldset>
-        <span id="capturegrid" style="padding-right: 10px; flex-grow: 1; justify-content: flex-start; overflow: auto;" hx-get="/job/{{ name }}/snapshot/list" hx-trigger="load, updatecapture from:body">
-            <div>1</div>
-            <div>1</div>
-            <div>1</div>
-            <div>1</div>
-            <div>1</div>
-            <div>1</div>
-            <div>1</div>
-            <div>1</div>
-        </span>
-        <button style="height: 5em;" hx-get="/job/{{ name }}/snapshot" hx-target="#capturegrid" hx-swap="innerHTML">Snapshot</button>
+        <span id="capturegrid" style="padding-right: 10px; flex-grow: 1; justify-content: flex-start; overflow: auto;" hx-get="/job/{{ name }}/snapshot/list" hx-trigger="load, updatecapture from:body"></span>
+        <button style="min-height: 3em;" hx-post="/job/{{ name }}/complete">Complete</button>
     </div>
 </div>

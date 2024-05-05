@@ -1,10 +1,17 @@
 #!/usr/bin/env python
 
 from flask import Flask, render_template, request, Response, send_file, redirect, url_for, send_from_directory, json
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageStat
+from geventwebsocket.websocket import WebSocket
+from werkzeug.routing import Rule
+from flask_sockets import Sockets
+from typing import Optional
 from pathlib import Path
 import requests
 import datetime
+import socket
+import time
+import math
 import glob
 import uuid
 import fitz
@@ -13,19 +20,50 @@ import io
 import re
 import os
 
-app = Flask(__name__)
+app:Flask = Flask(__name__)
+sockets:Sockets = Sockets(app)
 
 app.config.update(
     FLASK_APP="buildmonitor",
     RES_FOLDER = "res",
-    JOB_FOLDER = "job",
-    IMPORT_FOLDER = "import",
-    COMPLETE_FOLDER = "complete"
+    JOB_FOLDER = "data/job",
+    IMPORT_FOLDER = "data/import",
+    COMPLETE_FOLDER = "data/complete"
 )
+
+@sockets. .on('connect')
+def onconnect(e):
+    print(f"{e=}")
+    pass
+
+# https://github.com/jgelens/gevent-websocket/blob/master/geventwebsocket/websocket.py
+@sockets.route('/ws', websocket=True)
+def any_event(ws: WebSocket):
+
+    print(f"{ws=}")
+#    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM | socket.SOCK_NONBLOCK)
+    msg = ws.receive()
+    print(f"{msg}")
+
+    msg = ws.receive()
+    print(f"{msg}")
+    msg = ws.receive()
+    print(f"{msg}")
+    msg = ws.receive()
+    print(f"{msg}")
+    pass
+sockets.url_map.add(Rule('/ws', endpoint=any_event, websocket=True))
+
+#@socketio.on('connect')
+#def ws(auth):
+#    print(f"{auth=}")
+#def ws(ws: SocketIO):
+#    data = ws.receive()
+#    print(f"{data=}")
 
 @app.route('/', methods=['GET'])
 def index():
-    return render_template('index.html')
+    return render_template('index.html', camerafps=0.5, pos="float")
 
 @app.route('/res/<path:name>', methods=['GET'])
 def res(name):
@@ -41,31 +79,142 @@ def res(name):
 #        return json.jsonify({"status": exists})
 
 @app.route('/job/list', methods=['GET'])
-def joblist():
+def joblist() -> Response:
     filter = request.values.get("selectsearch")
     jobs = getjobs(filter)
-    hxattrs = []
-    for job in jobs:
-        hxattrs.append(f"hx-get=\"job/{job}\" hx-target=\"#workview\"")
-    return htmloptions(jobs, hxattrs)
+#    print(f"{jobs=}")
+#    hxattrs = []
+#    for job in jobs:
+#        hxattrs.append(f"hx-get=\"job/{job}\" hx-target=\"#workview\"")
+    return Response(render_template('listoptions.html', category="job", items=jobs))
 
 @app.route('/camera', methods=['GET'])
 def camera() -> Response:
-#    r = requests.get('http://localhost:5000/res/webcam.jpg')
-    r = requests.get('http://localhost:8080/?action=snapshot')
-#    return Response(io.BytesIO(r.content), mimetype='image/jpg')
+    """ sends a Response with a jpeg of a camera snapshot overlaid with a timestamp
+
+    Args:
+        none
+
+    Returns:
+        jpeg image over http
+    """
+    posstr:str = request.args.get("pos")
+
+    # try to get a new image over http
+    try:
+        r = requests.get('http://localhost:8080/?action=snapshot')
+    except requests.exceptions.ConnectionError as connerr:
+        return Response("failed to connect to camera", status=500)
+
+    # open the requested image
     with Image.open(io.BytesIO(r.content)) as im:
-        im2 = im.copy()
-        draw = ImageDraw.Draw(im2)
-        font = ImageFont.truetype("arial.ttf", 50)
-        draw.text((0, 0), datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S"), (255, 255, 180), font=font)
+        # try to make a copy of it
+        try:
+            im2 = im.copy()
+        except OSError as err:
+            return Response(f"OSError: {err}", status=500)
+
+        # add the timestamp to the copy
+        im2 = addcameratimestamp(im2, posstr)
+
+        # convert to jpeg bytes
         tmpimg = io.BytesIO()
         im2.save(tmpimg, format='JPEG')
+
+        # return jpeg image
         return Response(tmpimg.getvalue(), mimetype='image/jpg')
+
+def addcameratimestamp(im: Image.Image, pos: str = "ll") -> Optional[Image.Image]:
+    """Adds a timestamp to the image at pos
+
+    Args:
+        im: the image to timestamp
+        pos: "ul" = upper left, "ll" = lower left, "float" = move
+
+    Returns:
+        timestamped image
+    """
+    pos = pos if pos in ['ul', 'll', 'float'] else "ll"
+    # load default font
+    font = ImageFont.truetype("VT323-Regular.ttf", 32)
+    # make timestamp string using datetime strftime()
+    timestampstr = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S.%f%Z")
+    # get x and y size of the timestamp string rendered in the font
+    _, _, fx2, fy2 = font.getbbox(timestampstr)
+
+    xpos = None
+    ypos = None
+    if(pos == "ul"):
+        xpos = 0
+        ypos = 0
+    if(pos == "ll"):
+        xpos = 0
+        ypos = im.height - fy2
+    if(pos == "float"):
+        # number of steps in a one-way trip across the screen
+        xsteps = 29
+        ysteps = 61
+        # use epoch time to calulate which step of the total trip back and forth
+        xstep = time.time() % (xsteps * 2)
+        ystep = time.time() % (ysteps * 2)
+        # once step is greater than steps, pstep starts to count back down to zero instead of up to steps * 2
+        pxstep = xstep if xstep < xsteps else xsteps - (xstep - xsteps)
+        pystep = ystep if ystep < ysteps else ysteps - (ystep - ysteps)
+        # use pstep/steps ratio to scale the xpos up to the image width minus rendered font width
+        xpos = (pxstep / xsteps) * (im.width - fx2)
+        ypos = (pystep / ysteps) * (im.height - fy2)
+
+    # add the text to the image
+    im = imageaddtext(im, font=font, x=xpos, y=ypos, text=timestampstr)
+
+    return im
+
+# type for typing savings
+bmrgb = tuple[int, int, int]
+def imageaddtext(im: Image.Image, font: ImageFont = ImageFont.truetype("VT323-Regular.ttf", 24),
+                  x: int = 0, y: int = 0, text: str = "", lightcolor: bmrgb = (255, 255, 180),
+          darkcolor: bmrgb = (0, 0, 75)) -> Optional[Image.Image]:
+    """Adds text with a transparent gray background to im at (x,y) using font
+        the color of the text is selected from lightcolor or darkcolor by the 
+        brightness of the region where it would be rendered
+
+    Args:
+        im: the image to add the text to
+        font: the font to use for the text
+        x: render the text at x coord in im
+        y: render the text at y coord in im
+        text: the text string to render
+        lightcolor: light colored bmrgb tuple (red, green, blue)
+        darkcolor: dark colored bmrgb tuple (red, green, blue)
+    
+    Returns:
+        image with text and background added
+    """
+
+    # render text with font and get the bounding box size
+    fx0, fy0, fx1, fy1 = font.getbbox(text)
+    # calulate font width and heigh
+    fw:int = fx1 - fx0
+    fh:int = fy1 - fy0
+    # crop im to just the region covered by the text and convert it to grayscale
+    fa = im.crop(box=(x, y, x + fx1, y + fy1)).convert('L')
+    # prepare for some cropped image stats
+    stat = ImageStat.Stat(fa)
+    # use the rms brightness to determine light or dark text
+    fill:bmrgb = lightcolor if stat.rms[0] < 100 else darkcolor
+
+    # make a draw object with mode RGBA for blending
+    draw = ImageDraw.Draw(im, mode="RGBA")
+    # draw a semi-transparent rectangle where the font will be drawn
+    draw.rectangle(xy=(x - 6, y, x + fa.width + 6, y + fa.height + 6), fill=(128, 128, 128, 96))
+    # draw the text over the rectangle
+    draw.text(xy=(x, y), text=text, fill=fill, font=font)
+
+    return im
 
 @app.route('/job/<name>/image', methods=['GET'])
 def jobnameimage(name: str) -> Response:
-    return send_file(f"job/{name}/{name}.png")
+    return send_file(f"job/{name}/doc-0000.png")
 
 @app.route('/job/<name>/complete', methods=['GET'])
 def jobnamecomplete(name: str) -> Response:
@@ -74,11 +223,9 @@ def jobnamecomplete(name: str) -> Response:
     return send_file(f"job/{name}/{name}.png")
 
 @app.route('/job/<name>/snapshot/list', methods=['GET'])
-def jobnamesnapshotlist(name: str):
-    ret = ""
+def jobnamesnapshotlist(name: str) -> Response:
     jobdir = f"{app.config['JOB_FOLDER']}/{name}"
-    greatest = 0
-    files = sorted(Path(jobdir).iterdir(), key=os.path.getmtime)
+    files = sorted(Path(jobdir).iterdir(), key=os.path.basename, reverse=True)
     snaps = []
     for file in files:
         print(f"{file.name=}")
@@ -86,9 +233,8 @@ def jobnamesnapshotlist(name: str):
         if res:
             print(f"{file.name=} matched")
             snaps.append(f"{res.group(1)}")
-    for snap in snaps:
-        ret += render_template("capturegriditem.html", name=name, snapnum=snap)
-    return ret
+
+    return Response(render_template("capturegriditem.html", name=name, snaps=snaps, camerafps=5))
 
 @app.route('/job/<name>/snapshot/image/<snapnum>', methods=['GET'])
 def jobnamesnapshotimagesnapnum(name: str, snapnum: int) -> Response:
@@ -132,14 +278,14 @@ def jobnamesnapshot(name: str) -> Response:
     return Response(render_template("jobcapture.html", name=name),  headers=headers)
 
 @app.route('/job/<name>')
-def jobname(name: str):
-    return render_template("jobcapture.html", name=name)
+def jobname(name: str) -> Response:
+    return Response(render_template("jobcapture.html", name=name))
 
-@app.route('/job/import', methods=['GET'])
-def jobcreate_get():
-    return render_template('jobimport.html')
+@app.route('/import', methods=['GET'])
+def jobcreate_get() -> Response:
+    return Response(render_template('jobimport.html'))
 
-@app.route('/job/import/<pdfid>/<pagenum>/create', methods=['POST'])
+@app.route('/import/<pdfid>/<pagenum>/create', methods=['POST'])
 def jobimportcreate(pdfid, pagenum) -> Response:
     jobname = request.values.get("jobname")
     if not len(jobname) > 0:
@@ -150,7 +296,7 @@ def jobimportcreate(pdfid, pagenum) -> Response:
         cliprect = [ 0.0, 0.0, 1.0, 1.0 ]
 
     try:
-        with fitz.open(f"job/{pdfid}.pdf") as pdfdoc:
+        with fitz.open(f"{app.config['IMPORT_FOLDER']}/{pdfid}.pdf") as pdfdoc:
             # page count
             pagecnt = pdfdoc.page_count
             # pdf numbers pages beginning at 1... python lists start at 0
@@ -160,9 +306,9 @@ def jobimportcreate(pdfid, pagenum) -> Response:
     except fitz.mupdf.FzErrorFormat as err:
         return Response(404)
 
-    if not os.path.isdir(f"job/{jobname}"):
-        os.mkdir(f"job/{jobname}")
-    if not os.path.isdir(f"job/{jobname}"):
+    if not os.path.isdir(f"{app.config['JOB_FOLDER']}/{jobname}"):
+        os.mkdir(f"{app.config['JOB_FOLDER']}/{jobname}")
+    if not os.path.isdir(f"{app.config['JOB_FOLDER']}/{jobname}"):
         return Response("no job directory", status=404)
 
     pagepng = io.BytesIO(pagepix.tobytes(output="png"))
@@ -180,7 +326,7 @@ def jobimportcreate(pdfid, pagenum) -> Response:
     # set the crop
     cropimg = pageimg.crop(box)
 
-    files = glob.glob(f"job/{pdfid}/doc*.png")
+    files = glob.glob(f"{app.config['JOB_FOLDER']}/{pdfid}/doc-*.png")
     greatest = -1
     for file in files:
         res = re.search("^doc-([0-9][0-9][0-9][0-9]).png$")
@@ -189,46 +335,42 @@ def jobimportcreate(pdfid, pagenum) -> Response:
             greatest = i if i > greatest else greatest
     docname = f"doc-{str(greatest + 1).zfill(4)}"
     # save the cropped images as a png to a bytesio
-    cropimg.save(f"job/{jobname}/{docname}.png", format="PNG")
+    cropimg.save(f"{app.config['JOB_FOLDER']}/{jobname}/{docname}.png", format="PNG")
 
     headers = { "HX-Trigger-After-Settle": "updatejob" }
     return Response(render_template("ocrcontrols.html", page=pagenum, pagecnt=pagecnt, pdfid=pdfid, jobname=jobname), headers=headers)
 
-@app.route('/job/import/list', methods=['GET'])
+@app.route('/import/list', methods=['GET'])
 def jobimportlist() -> Response:
     importfilter = request.values.get("importsearch")
     importfilter = importfilter if importfilter else ""
 
-    pdffiles = glob.glob("job/*.pdf")
-    ret = []
-    hxattrs = []
+    pdffiles = glob.glob(f"{app.config['IMPORT_FOLDER']}/*.pdf")
+    ret:list = []
     for pdffile in pdffiles:
-        res = re.search('job/(.*)\.pdf', pdffile)
+        res = re.search(f"{app.config['IMPORT_FOLDER']}/(.*)\.pdf", pdffile)
         if res:
             pdfid = res.group(1)
             if len(importfilter) == 0 or importfilter in pdfid:
                 ret.append(pdfid)
-                hxattrs.append(f"hx-get=\"job/import/{pdfid}/1/ocr\" hx-target=\"#workview\"")
-    if len(ret) == 0:
-        return Response(htmloptions([ "None" ], attrs=[ "disabled" ]))
 
-    return Response(htmloptions(ret, attrs=hxattrs))
+    return Response(render_template('listoptions.html', category="import", items=ret))
 
 # display the job create ocr view
-@app.route('/job/import/<pdfid>/<pagenum>/ocr', methods=['GET'])
+@app.route('/import/<pdfid>/<pagenum>/ocr', methods=['GET'])
 def importocrview(pdfid, pagenum):
     pagecnt = request.args.get("pagecnt")
     return render_template('jobcreate.html', pdfid=pdfid, page=pagenum, pagecnt=pagecnt, ocrcursize=[ 100, 33 ])
 
 # perform ocr on a cropped region of a page in {pdfid}.pdf then update the page controls
-@app.route('/job/import/<pdfid>/<pagenum>/ocr', methods=['POST'])
+@app.route('/import/<pdfid>/<pagenum>/ocr', methods=['POST'])
 def jobcreatepdfocr_get(pdfid, pagenum) -> Response:
     # open the file {pdfid}.pdf, get the page count and grab a pixmap of page {pagenum}
     pagecnt = False
     page = False
     pagepix = False
     try:
-        with fitz.open(f"job/{pdfid}.pdf") as pdfdoc:
+        with fitz.open(f"{app.config['IMPORT_FOLDER']}/{pdfid}.pdf") as pdfdoc:
             # page count
             pagecnt = pdfdoc.page_count
             # pdf numbers pages beginning at 1... python lists start at 0
@@ -294,7 +436,7 @@ def renderocrresponse(page: int, pagecnt: int, pdfid: str, jobname: str) -> Resp
     return Response(render_template("ocrcontrols.html", page=page, pagecnt=pagecnt, pdfid=pdfid, jobname=jobname),  headers=headers)
 
 # get a png, jpg, or pdf of a single page in the file {pdfid}.pdf
-@app.route('/job/import/<pdfid>/<pagenum>', methods=['GET'])
+@app.route('/import/<pdfid>/<pagenum>', methods=['GET'])
 def jobcreatepdf_get(pdfid, pagenum) -> Response:
     fmt = request.args.get("format")
     if not fmt:
@@ -302,7 +444,7 @@ def jobcreatepdf_get(pdfid, pagenum) -> Response:
     if fmt not in ["png", "jpg", "pdf"]:
         return Response(404)
     try:
-        with fitz.open(f"job/{pdfid}.pdf") as pdfdoc:
+        with fitz.open(f"{app.config['IMPORT_FOLDER']}/{pdfid}.pdf") as pdfdoc:
             page = pdfdoc[int(pagenum) - 1]
             img = page.get_pixmap().tobytes(output=fmt)
             return Response(img, mimetype=f"image/{fmt}", direct_passthrough=True)
@@ -310,15 +452,13 @@ def jobcreatepdf_get(pdfid, pagenum) -> Response:
         return Response(404)
 
 # upload a pdf to import jobs from and save it with a randomized name
-@app.route('/job/import', methods=['POST'])
-def jobcreate_post():
+@app.route('/import', methods=['POST'])
+def importpost_post() -> Response:
     # get the bytes of the uploaded pdf
     pdf = request.files['newjobpdf']
     pdfid = Path(pdf.filename).stem
     fio = io.BytesIO(pdf.read())
-    res = re.search('job/(.*)\.pdf', pdf.filename)
-    if res:
-        pdfid = res.group(1)
+
     # make sure it is a pdf and not just any format fitz can open
     pagecnt = False
     try:
@@ -326,50 +466,54 @@ def jobcreate_post():
             if pdfdoc.is_pdf:
                 pagecnt = pdfdoc.page_count
     except fitz.mupdf.FzErrorFormat as err:
-        print("Bad PDF Exception")
+        print(f"{err=}")
 
     if not pagecnt:
-        return { "success": False }
+        return Response({ "success": False }, status=500)
 
     # reset the bytesio so we can read it again
     fio.seek(0)
     # random file name
     #pdfid = uuid.uuid4().hex
     # write the pdf to disk
-    with open(f"job/{pdfid}.pdf", "wb") as f:
+    with open(f"{app.config['IMPORT_FOLDER']}/{pdfid}.pdf", "wb") as f:
         f.write(fio.getbuffer())
 
     headers = { "HX-Trigger-After-Settle": "updateimport" }
     return Response(render_template('jobcreate.html', pdfid=pdfid, page=1, pagecnt=pagecnt, ocrcursize=[ 100, 33 ]), headers=headers)
 
-@app.route('/job/complete/list', methods=['GET'])
+@app.route('/complete/list', methods=['GET'])
 def jobcompletelist() -> Response:
-    return Response(htmloptions(['None']))
+    items:list = []
+    return Response(render_template('listoptions.html', category="complete", items=items))
 
-def htmloptions(options, attrs=[]):
-    if len(attrs) != len(options):
-        attrs = []
-        for o in options:
-            attrs.append("")
+def getjobs(filter: str="") -> list:
+    """Gets a list of job name by iterating all the subfolders of JOB_FOLDER ordered by mtime
 
-    ret = ""
-    for i in range(0, len(options)):
-        ret += f"<option {attrs[i]}>{options[i]}</option>"
-    return ret
+    Args:
+        filter: text to filter on or "" for no filter
 
-def getjobs(filter=""):
+    Returns:
+        list of job names
+    """
     filter = filter if filter else ""
-
-    JOBDIR = 'job/'
-    jobs = []
+    # ALL CAPS CONST
+    JOBDIR = f"{app.config['JOB_FOLDER']}/"
+    # list of jobnames that pass the filter
+    jobs:list = []
+    # get a list of dir items sorted by mytime
     dirs = sorted(Path(JOBDIR).iterdir(), key=os.path.getmtime)
     for dir in dirs:
+        # ignore all files
         if dir.is_file():
             continue
-        dirname = str(dir).replace("job/", "", 1)
+        # slice JOBDIR off the beginning of the dir string
+        dirname = str(dir)[len(JOBDIR):]
+        # only append if filter length is zero or filter exists as a substring in dirname
         if len(filter) == 0 or filter.lower() in dirname.lower():
             jobs.append(dirname)
 
+    return jobs
 #    for root, dirs, files in os.walk(JOBDIR):
 #        for dir in dirs:
 #            if len(filter) > 0:
@@ -377,24 +521,55 @@ def getjobs(filter=""):
 #                    jobs.append(dir)
 #            else:
 #                jobs.append(dir)
-    return jobs
 #            print(f"dir: {dir}")
 #    for x in jerbs:
 #        print(f"|{x}|")
 
-def checkdirs():
-    # res folder
-    checkdirs = [ app.config['RES_FOLDER'], app.config['JOB_FOLDER'], app.config['IMPORT_FOLDER'], app.config['COMPLETE_FOLDER'] ]
+def checkdirs() -> bool:
+    """Checks that the folders in checkdirs exist, same for mkdirs but also attempts to make them
 
+    Args:
+        none
+
+    Returns:
+        True if all dirs exist, False otherwise
+    """
+    # res folder is part of git, it should always exist
+    checkdirs = [ app.config['RES_FOLDER'] ]
+    # these folders are made if they don't already exist
+    mkdirs = [ app.config['JOB_FOLDER'], app.config['IMPORT_FOLDER'], app.config['COMPLETE_FOLDER'] ]
+
+    # if allgood goes False at any point it will stay that way
     allgood = True
     for dir in checkdirs:
-        allgood = allgood and makedirifnotexist(dir)
+        allgood = allgood and direxists(dir)
+    for dir in mkdirs:
+        allgood = allgood and direxists(dir, mkdir=True)
+
     return allgood
 
-def makedirifnotexist(dir):
-    if not os.path.isdir(dir):
-        os.mkdir(dir)
+def direxists(dir: str, mkdir: bool=False) -> bool:
+    """Check if directory dir exists, attempt to make it if mkdir is True
+
+    Args:
+        dir: path to directory
+        mkdir: when True, attempt to make the directory if it doesn't exist
+    
+    Returns:
+        True if dir exists, False otherwise
+    """
+    # only attempt to make dir if dir doesn't currently exist and  mkdir is True
+    if os.path.isdir(dir) != True and mkdir:
+        os.makedirs(dir, exist_ok=True)
+
+    # return the final check
     return True if os.path.isdir(dir) else False
 
 if __name__ == '__main__':
-    app.run(host='::0', port=5000, debug=True)
+    checkdirs()
+#    socketio.run(app, host='::0', port=5000, debug=True)
+    from gevent import pywsgi
+    from geventwebsocket.handler import WebSocketHandler
+    server = pywsgi.WSGIServer(('::0', 5000), app, handler_class=WebSocketHandler)
+    print('server start')
+    server.serve_forever()

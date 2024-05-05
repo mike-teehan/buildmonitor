@@ -1,20 +1,20 @@
         <button>TEST!</button>
-        <form id="ocr" hx-post="/job/import/{{ pdfid }}/{{ page }}/create" hx-trigger="click from:#savebtn" hx-target="#actionbtns" hx-swap="innerHTML">
+        <form id="ocr" hx-post="/import/{{ pdfid }}/{{ page }}/create" hx-trigger="click from:#savebtn" hx-target="#actionbtns" hx-swap="innerHTML">
             {% if page | int > 1 %}
-            <button hx-get="/job/import/{{ pdfid }}/{{ page | int - 1 }}/ocr?pagecnt={{ pagecnt }}" hx-target="#workview"><b>&lt;</b></button>
+            <button hx-get="/import/{{ pdfid }}/{{ page | int - 1 }}/ocr?pagecnt={{ pagecnt }}" hx-target="#workview"><b>&lt;</b></button>
             {% else %}
             <button disabled><b>&lt;</b></button>
             {% endif %}
             <span>{{ page }} | {{ pagecnt }}</span>
             {% if pagecnt | int > page | int %}
-            <button hx-get="/job/import/{{ pdfid }}/{{ page | int + 1 }}/ocr?pagecnt={{ pagecnt }}" hx-target="#workview"><b>&gt;</b></button>
+            <button hx-get="/import/{{ pdfid }}/{{ page | int + 1 }}/ocr?pagecnt={{ pagecnt }}" hx-target="#workview"><b>&gt;</b></button>
             {% else %}
             <button disabled><b>&gt;</b></button>
             {% endif %}
             <span style="width: 4em;">&nbsp;</span>
             <label for="jobname">Job Name: </label>
             <input id="jobname" name="jobname" type="text" value="{{ jobname }}" placeholder="John Doe"
-                hx-post="/job/import/{{ pdfid }}/{{ page }}/ocr" hx-trigger="click from:#pdfpage" hx-target="#actionbtns" hx-swap="innerHTML">
+                hx-post="/import/{{ pdfid }}/{{ page }}/ocr" hx-trigger="click from:#pdfpage" hx-target="#actionbtns" hx-swap="innerHTML">
             <button id="savebtn">Dave!</button>
             <input id="ocrrect" name="ocrrect" type="hidden">
         </form>
