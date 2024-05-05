@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+    body {
+        position: absolute;
+        margin: 0;
+    }
+    body, #content {
+        top: 0; bottom: 0;
+        left: 0; right: 0;
+        min-width: 100%; height: 100%;
+    }
+    #content {
+        position: relative;
+        overflow: hidden;
+        background-color: #063315;
+    }
+    #logo {
+        position: absolute;
+        top: 200px;
+        left: 400px;
+        width: 200px;
+        height: 200px;
+        background-image: url('../res/indologo.png');
+        background-size: contain;
+        background-position: center;
+        background-repeat: no-repeat;
+        animation: moveX 23s linear 0s infinite alternate, moveY 37s linear 0s infinite alternate;
+    }
+    @keyframes moveX {
+        from { left: 0vw; } to { left: 85vw; }
+    }
+    @keyframes moveY {
+        from { top: 0vh; } to { top: 70vh; }
+    }
+    .login-panel {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    #login-panel-0 {
+        width: 100%;
+        height: 50%;
+        background-color: #05300c5b;
+        filter: blur(0.5em);
+        background-image: url('../res/plants.jpg');
+        background-size: contain;
+        background-position: center;
+        opacity: 0.7;
+        animation: bandslide 20s linear 0s infinite;
+    }
+    @keyframes bandslide {
+        from { left: 0vw; } to { left: 100vw; }
+    }
+    #login-panel-1 {
+        backdrop-filter: blur(0.5em);
+        width: 25rem;
+        height: 18rem;
+        background-color: #f0ffff3c;
+        border-radius: 2em;
+        box-shadow: inset 0px 0px 5px 0.7em black;
+        box-sizing: border-box;
+    }
+    #login-text {
+        grid-column: 1 / span 3;
+        text-align: center;
+        margin-top: 0;
+    }
+    #login-buttons {
+        grid-column: 1 / span 3;
+        text-align: right;
+    }
+    .login-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: absolute;
+        top: 0; bottom: 0;
+        left: 0; right: 0;
+        width: 100%; height: 100%;
+    }
+    #inputs {
+        display: grid;
+        gap: 1em;
+        grid-auto-columns: min-content;
+        grid-template-columns: 6fr 1fr 1fr;
+    }
+    .login-label {
+        text-align: right;
+    }
+    #login-reset:link, #login-reset:visited {
+        color: blue;
+        text-decoration: none;
+    }
+        </style>
+    </head>
+    <body>
+    <div id="content">
+        <div class="login-wrapper">
+            <div id="login-panel-0" class="login-panel">&nbsp;</div>
+        </div>
+        <div id="logo"></div>
+        <div class="login-wrapper">
+            <div id="login-panel-1" class="login-panel">&nbsp;</div>
+        </div>
+        <div class="login-wrapper">
+            <div id="login-inputs">
+                <form id="login" action="javascript:void(0);">
+                    <span id="inputs">
+                        <h1 id="login-text">Login</h1>
+                        <input id="login-name" name="login-name" class="login-input" type="text" value="" placeholder="username">
+                        <span></span>
+                        <button id="username-clear-button">X</button>
+                        <input id="password" name="password" class="login-input" type="password" value="" placeholder="password">
+                        <button id="password-preview-button">&#128065;</button>
+                        <button id="password-clear-button">X</button>
+                        <span style="grid-column: 1 / span 3;"></span>
+                        <span id="login-buttons">
+                            <a id="login-reset" href="#">reset</a>&nbsp;<button id="login-submit">Login</button>
+                        </span>
+                    </span>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+"use strict";
+
+// cache some DOM elements we're going to set event handlers on
+const ucb = document.getElementById("username-clear-button");
+const ppb = document.getElementById("password-preview-button");
+const pcb = document.getElementById("password-clear-button");
+const fr = document.getElementById("login-reset");
+
+ucb.onclick = clearusername;
+// initial mousedown on ppb
+ppb.onmousedown = (e) => {
+    showpassword(true);
+    e.preventDefault();
+    return false;
+}
+
+// any other mouse events on ppb cancel the password being shown
+ppb.onclick = previewhidepassword;
+ppb.onmouseup = previewhidepassword;
+ppb.onmouseout = previewhidepassword;
+function previewhidepassword(e) {
+    showpassword(false);
+    e.preventDefault();
+    return false;
+}
+// clear password when pcb clicked
+pcb.onclick = clearpassword;
+// clear entire form on 'reset' click
+fr.onclick = resetform;
+// initialize form with a reset
+resetform();
+
+// swap the password input type between text and ******
+function showpassword(show) {
+    const type = (show) ? "text" : "password";
+    document.getElementById("password").type = type;
+}
+
+// clear username
+function clearusername(e) {
+    let d = document.getElementById("login-name");
+    d.value = "";
+    d.focus();
+    e?.preventDefault();
+    return false;
+}
+
+// clear password
+function clearpassword(e) {
+    let p = document.getElementById("password");
+    p.value = "";
+    p.focus();
+    e?.preventDefault();
+    return false;
+}
+
+// clear username and password, set focus on username
+function resetform(e) {
+    clearusername();
+    clearpassword();
+    document.getElementById("login-name").focus();
+    e?.preventDefault();
+    return false;
+}
+    </script>
+    </body>
+</html>
