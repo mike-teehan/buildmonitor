@@ -1,0 +1,19 @@
+        <button>TEST!</button>
+        <form id="crop" hx-post="/job/import/{{ pdfid }}/{{ page }}/create" hx-trigger="click from:#savebtn" hx-target="#actionbtns" hx-swap="innerHTML">
+            {% if page|int > 1 %}
+            <button hx-get="/job/import/{{ pdfid }}/{{ page | int - 1 }}/ocr?pagecnt={{ pagecnt }}" hx-target="#workview"><b>&lt;</b></button>
+            {% else %}
+            <button disabled><b>&lt;</b></button>
+            {% endif %}
+            <span>{{ page }} | {{ pagecnt }}</span>
+            {% if pagecnt|int > page|int %}
+            <button hx-get="/job/import/{{ pdfid }}/{{ page | int + 1 }}/ocr?pagecnt={{ pagecnt }}" hx-target="#workview"><b>&gt;</b></button>
+            {% else %}
+            <button disabled><b>&gt;</b></button>
+            {% endif %}
+            <span style="width: 4em;">&nbsp;</span>
+            <label for="jobname">Job Name: </label>
+            <button id="savebtn">Dave!</button>
+            <input id="ocrrect" name="ocrrect" type="hidden">
+        </form>
+        <button>DELETE</button>

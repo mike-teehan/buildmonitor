@@ -1,0 +1,7 @@
+{% if items|length == 0 %}
+<option disabled>None</option>
+{% else %}
+{% for item in items %}
+<option hx-get="{{ category }}/{{ item }}" hx-target="#workview">{{ item }}</option>
+{% endfor %}
+{% endif %}
